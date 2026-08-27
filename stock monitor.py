@@ -1,4 +1,5 @@
 import time
+import os
 import datetime
 import smtplib
 from email.mime.text import MIMEText
@@ -6,10 +7,11 @@ from email.mime.multipart import MIMEMultipart
 import pandas as pd
 import yfinance as yf
 
-# ==================== Email 參數設定 (請在這裡填入你的資料) ====================
-SENDER_EMAIL = "Changjimmy0014@gmail.com"  # <-- 請改成你的真實 Gmail
-SENDER_PASSWORD = "aqgyyucarfphwlcl"  # <-- 請改成你剛剛拿到的 16 碼應用程式密碼 (不要有空格)
-RECEIVER_EMAIL = "Cshen0525@gmail.com"  # <-- 請改成你要接收通知的信箱 (可以填跟上面一樣)
+# 優先讀取雲端環境變數，若本機執行沒有設定則使用你原本寫的帳密
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "Changjimmy0014@gmail.com")
+SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "aggvyucarfphwlcl")
+RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "Cshen0525@gmail.com")
+
 
 # ==================== 監控魚池參數設定 ====================
 WATCHLIST = {
