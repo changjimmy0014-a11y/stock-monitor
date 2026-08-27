@@ -1,0 +1,32 @@
+name: Stock Monitor Daily Check
+
+on:
+  schedule:
+    # 台灣時間週一至週五下午 14:30 (UTC 時間為 06:30)
+    - cron: '30 06 * * 1-5'
+  workflow_dispatch: # 允許你在網頁上隨時手動點按鈕立即測試
+
+jobs:
+  run-python:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance pandas requests
+
+      - name: Run script
+        env:
+          # 從 GitHub 密鑰中安全讀取你的帳號與密碼
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+        run: |
+          python stock_monitor.py
