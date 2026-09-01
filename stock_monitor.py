@@ -7,6 +7,7 @@ from email.mime.multipart import MIMEMultipart
 import pandas as pd
 import yfinance as yf
 from google import genai
+from google.genai import types
 
 # ==================== 環境變數與密碼設定 ====================
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "Changjimmy0014@gmail.com")
@@ -34,7 +35,7 @@ WATCHLIST = {
 
 
 def get_ai_analysis(ticker_symbol, name):
-    """具備終極防禦網的 AI 分析模組，自動測試所有模型名稱"""
+    """具備 Google 即時搜尋能力與當沖策略的 AI 決策模組"""
     if not ai_client:
         return "⚠️ 系統未偵測到 GEMINI_API_KEY，略過 AI 深度分析。"
 
@@ -47,13 +48,18 @@ def get_ai_analysis(ticker_symbol, name):
         news_text = "\n".join([f"- {n.get('title', '')}" for n in news_list[:3]]) if news_list else "無重大新聞"
 
         prompt = f"""
-        你是一位專業、敏銳的台股操盤手。今日系統篩選出的殖利率冠軍是【{name} ({ticker_symbol})】。
+        你是一位專業、具備即時資訊檢索能力的台股操盤手。今日系統篩選出的殖利率冠軍是【{name} ({ticker_symbol})】。
         以下是該標的近5日K線：\n{kline_text}\n
         近期新聞：\n{news_text}\n
 
-        請用繁體中文回答以下兩個部分：
-        1. 【首選標的解析】：針對【{name} ({ticker_symbol})】給出簡短的盤勢短評、操作建議（含預約單進場價與防守價）。
-        2. 【AI 獨家觀點與個股推薦】：除了上述清單，請根據你對目前台股趨勢的觀察，額外推薦 1-2 檔近期看好的「台股個股」（非ETF），並簡述推薦理由。
+        請用繁體中文回答以下三個部分：
+        1. 【首選存股解析】：針對【{name} ({ticker_symbol})】給出簡短的盤勢短評、操作建議（含預約單進場價與防守價）。
+
+        2. 【市場多空雷達 (動態搜尋)】：請利用你的網路搜尋能力，檢索「今日台股 焦點新聞 營收 醜聞」等最新資訊。跳脫原本的清單，找出：
+           - 🔥 利多潛力股 (1~2檔)：近期發布好消息（如營收創高、新產品發表、接到大單）預期股價看漲的個股，並附上新聞原因。
+           - ⚠️ 利空避雷針 (1~2檔)：近期爆出壞消息（如財報不佳、高層醜聞、掉單）預期股價看跌或建議避開的個股，並附上新聞原因。
+
+        3. 【明日當沖雷達】：依據今日盤面資金流向與爆量強勢股，推薦 1 檔適合「明日早盤當沖（或隔日沖）」的標的。請務必給出明確的「預估進場價區間」、「目標停利價」與「嚴格停損價」，並簡述當沖理由。
         """
 
         model_candidates = [
@@ -62,16 +68,20 @@ def get_ai_analysis(ticker_symbol, name):
             'gemini-2.0-flash',
             'gemini-1.5-flash',
             'gemini-flash-latest',
-            'gemini-pro',
-            'gemini-1.5-pro'
         ]
 
         last_error = None
         for model_name in model_candidates:
             try:
+                config = types.GenerateContentConfig(
+                    tools=[{"google_search": {}}],
+                    temperature=0.7
+                )
+
                 response = ai_client.models.generate_content(
                     model=model_name,
                     contents=prompt,
+                    config=config
                 )
                 if response and response.text:
                     return response.text
@@ -90,6 +100,7 @@ def send_email_notification(subject, message):
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
 
+        # 💡 這裡明確定義了收件人清單，解決未定義錯誤
         receivers_list = [RECEIVER_EMAIL, "b0981155209@gmail.com"]
 
         msg['To'] = ", ".join(receivers_list)
@@ -130,26 +141,25 @@ def main():
     top_3 = yield_ranking[:3]
     best_stock = top_3[0]
 
-    report_text = "🏆 今日最高殖利率 Top 3 推薦：\n\n"
+    report_text = "🏆 今日最高殖利率 Top 3 推薦 (防守型存股)：\n\n"
     for i, stock in enumerate(top_3, start=1):
         report_text += f"第 {i} 名：{stock['name']} | 現價: {stock['price']} | 預估殖利率: {stock['yield_pct']}%\n"
 
     report_text += "\n" + "=" * 40 + "\n"
-    report_text += f"🧠 【AI 代理人深度解析與個股推薦】\n"
+    report_text += f"🧠 【AI 代理人市場深度解析與多空雷達】\n"
     report_text += "-" * 40 + "\n"
 
-    print(f"正在呼叫 Gemini 分析首選標的並尋找額外個股推薦...")
+    print(f"正在呼叫 Gemini 連線網路搜尋最新市場動態...")
     ai_report = get_ai_analysis(best_stock['id'], best_stock['name'])
     report_text += ai_report
 
-    # 💡 這裡加上零股雙時段作戰指南，方便直接參照
     report_text += "\n\n" + "=" * 40 + "\n"
     report_text += "⏰ 【大戶投零股作戰時間表】\n"
     report_text += "▶ 方案A (盤中零股)：13:30 前完成掛單 (依據即時跳動價格撮合)\n"
     report_text += "▶ 方案B (盤後零股)：13:40 ~ 14:30 掛單 (只能以當天「收盤價」進行單一價格撮合)\n\n"
-    report_text += "👉 策略建議：13:00 收到報告後，可先掛盤中零股測試；若未成交，13:40 後再改掛盤後零股等運氣！"
+    report_text += "⚠️ 當沖與避雷提醒：AI 推薦之當沖標的為「明日早盤」之規劃；利空標的請檢查自身持股，適時避開風險！"
 
-    subject = f"🧠 AI 戰報：首選 {best_stock['name']} 暨獨家個股推薦"
+    subject = f"🧠 MCP 戰報：首選 {best_stock['name']} 暨動態多空雷達"
     send_email_notification(subject, report_text)
 
 
