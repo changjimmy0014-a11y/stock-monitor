@@ -6,7 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import pandas as pd
 import yfinance as yf
-from google import genai  # 確保使用最新版 SDK
+from google import genai
 
 # ==================== 環境變數與密碼設定 ====================
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "Changjimmy0014@gmail.com")
@@ -53,10 +53,9 @@ def get_ai_analysis(ticker_symbol, name):
 
         請用繁體中文回答以下兩個部分：
         1. 【首選標的解析】：針對【{name} ({ticker_symbol})】給出簡短的盤勢短評、操作建議（含預約單進場價與防守價）。
-        2. 【AI 獨家觀點與個股推薦】：除了上述系統硬編碼的清單外，請根據你對目前台股市場趨勢、產業熱點的觀察，額外推薦 1-2 檔你近期看好的「台股個股」（非ETF），並簡述推薦理由。
+        2. 【AI 獨家觀點與個股推薦】：除了上述清單，請根據你對目前台股趨勢的觀察，額外推薦 1-2 檔近期看好的「台股個股」（非ETF），並簡述推薦理由。
         """
 
-        # 💡 終極輪詢清單：把最新指示的 3.6 放在首位，備用軍團排在後面
         model_candidates = [
             'gemini-3.6-flash',
             'gemini-2.5-flash',
@@ -78,7 +77,7 @@ def get_ai_analysis(ticker_symbol, name):
                     return response.text
             except Exception as e:
                 last_error = e
-                continue  # 遇到錯誤不崩潰，直接換下一個模型繼續測
+                continue
 
         return f"❌ 所有模型嘗試皆失敗，最後錯誤訊息：{last_error}"
 
@@ -91,8 +90,7 @@ def send_email_notification(subject, message):
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
 
-        # 這裡設定收件人，如需增加朋友信箱，請用逗號隔開加在後面，例如: [RECEIVER_EMAIL, "friend@gmail.com"]
-        receivers_list = [RECEIVER_EMAIL,"b0981155209@gmail.com"]
+        receivers_list = [RECEIVER_EMAIL, "b0981155209@gmail.com"]
 
         msg['To'] = ", ".join(receivers_list)
         msg['Subject'] = subject
@@ -143,7 +141,13 @@ def main():
     print(f"正在呼叫 Gemini 分析首選標的並尋找額外個股推薦...")
     ai_report = get_ai_analysis(best_stock['id'], best_stock['name'])
     report_text += ai_report
-    report_text += "\n\n👉 建議開啟永豐大戶投 APP，評估是否掛預約單進場！"
+
+    # 💡 這裡加上零股雙時段作戰指南，方便直接參照
+    report_text += "\n\n" + "=" * 40 + "\n"
+    report_text += "⏰ 【大戶投零股作戰時間表】\n"
+    report_text += "▶ 方案A (盤中零股)：13:30 前完成掛單 (依據即時跳動價格撮合)\n"
+    report_text += "▶ 方案B (盤後零股)：13:40 ~ 14:30 掛單 (只能以當天「收盤價」進行單一價格撮合)\n\n"
+    report_text += "👉 策略建議：13:00 收到報告後，可先掛盤中零股測試；若未成交，13:40 後再改掛盤後零股等運氣！"
 
     subject = f"🧠 AI 戰報：首選 {best_stock['name']} 暨獨家個股推薦"
     send_email_notification(subject, report_text)
