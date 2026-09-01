@@ -10,15 +10,18 @@ from google import genai
 from google.genai import types
 
 # ==================== 環境變數與密碼設定 ====================
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "Changjimmy0014@gmail.com")
-SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "aqgyyucarfphwlcl")
-RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "Cshen0525@gmail.com")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "")
+SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "")
+RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "")
 
-# 初始化新版 AI 用戶端
-ai_client = None
-if GEMINI_API_KEY:
-    ai_client = genai.Client(api_key=GEMINI_API_KEY)
+# 💡 請在下方引號中貼入真實的 API Key（例如 "AIzaSy..."）
+RAW_KEYS = [
+    os.environ.get("GEMINI_API_KEY", ""),
+    os.environ.get("GEMINI_API_KEY_BACKUP", "")
+]
+
+# 自動過濾無效金鑰與預設提示字串
+GEMINI_API_KEYS = [k for k in RAW_KEYS if k and not k.startswith("在此處貼上")]
 
 WATCHLIST = {
     "0050.TW": {"name": "元大台灣50", "div": 3.0},
@@ -35,9 +38,9 @@ WATCHLIST = {
 
 
 def get_ai_analysis(ticker_symbol, name):
-    """具備 Google 即時搜尋能力與當沖策略的 AI 決策模組"""
-    if not ai_client:
-        return "⚠️ 系統未偵測到 GEMINI_API_KEY，略過 AI 深度分析。"
+    """具備 Google 即時搜尋能力與多重模型/Key 自動備援機制的 AI 決策模組"""
+    if not GEMINI_API_KEYS:
+        return "⚠️ 系統未檢測到有效的 GEMINI_API_KEY，請在 RAW_KEYS 處填入 API 金鑰。"
 
     try:
         stock = yf.Ticker(ticker_symbol)
@@ -62,34 +65,48 @@ def get_ai_analysis(ticker_symbol, name):
         3. 【明日當沖雷達】：依據今日盤面資金流向與爆量強勢股，推薦 1 檔適合「明日早盤當沖（或隔日沖）」的標的。請務必給出明確的「預估進場價區間」、「目標停利價」與「嚴格停損價」，並簡述當沖理由。
         """
 
+        # 📋 完整的四階備援模型清單（由最新版依序降級試驗）
         model_candidates = [
             'gemini-3.6-flash',
             'gemini-2.5-flash',
             'gemini-2.0-flash',
-            'gemini-1.5-flash',
-            'gemini-flash-latest',
+            'gemini-1.5-flash'
         ]
 
         last_error = None
-        for model_name in model_candidates:
-            try:
-                config = types.GenerateContentConfig(
-                    tools=[{"google_search": {}}],
-                    temperature=0.7
-                )
 
-                response = ai_client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config=config
-                )
-                if response and response.text:
-                    return response.text
-            except Exception as e:
-                last_error = e
+        # 雙層備援機制：外層輪替 Key，內層依序嘗試模型
+        for api_key in GEMINI_API_KEYS:
+            try:
+                ai_client = genai.Client(api_key=api_key)
+
+                for model_name in model_candidates:
+                    try:
+                        config = types.GenerateContentConfig(
+                            tools=[{"google_search": {}}],
+                            temperature=0.7
+                        )
+
+                        response = ai_client.models.generate_content(
+                            model=model_name,
+                            contents=prompt,
+                            config=config
+                        )
+                        if response and response.text:
+                            print(f"✅ 成功使用模型 [{model_name}] 產出分析報告！")
+                            return response.text
+                    except Exception as model_err:
+                        last_error = model_err
+                        print(f"⚠️ 模型 [{model_name}] 呼叫失敗: {model_err}")
+                        time.sleep(1.5)  # 微幅延遲避開 API Rate Limit (429)
+                        continue
+
+            except Exception as key_err:
+                last_error = key_err
+                print(f"⚠️ API Key (...{api_key[-4:]}) 失敗，切換至下一組 Key...")
                 continue
 
-        return f"❌ 所有模型嘗試皆失敗，最後錯誤訊息：{last_error}"
+        return f"❌ 所有 API Key 及模型嘗試皆失敗，最後錯誤訊息：{last_error}"
 
     except Exception as e:
         return f"❌ AI 模組分析失敗：{e}"
@@ -100,7 +117,6 @@ def send_email_notification(subject, message):
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
 
-        # 💡 這裡明確定義了收件人清單，解決未定義錯誤
         receivers_list = [RECEIVER_EMAIL, "b0981155209@gmail.com"]
 
         msg['To'] = ", ".join(receivers_list)
