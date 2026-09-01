@@ -18,9 +18,9 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+- name: Install dependencies
         run: |
-          pip install yfinance pandas requests
+          pip install yfinance pandas requests google-generativeai
 
       - name: Run script
         env:
@@ -28,5 +28,6 @@ jobs:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python stock_monitor.py
