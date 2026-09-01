@@ -9,15 +9,15 @@ import yfinance as yf
 import google.generativeai as genai
 
 # ==================== 環境變數與密碼設定 ====================
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "你的信箱@gmail.com")
-SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "你的16碼密碼")
-RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "你的信箱@gmail.com")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "Changjimmy0014@gmail.com")
+SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "aqgyyucarfphwlcl")
+RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "Cshen0525@gmail.com")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # 換成最穩定的通用文字模型
-    model = genai.GenerativeModel('gemini-pro')
+    # 💡 修正這裡：改回最標準的 gemini-1.5-flash
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
 WATCHLIST = {
     "0050.TW":   {"name": "元大台灣50", "div": 3.0},     
@@ -33,7 +33,7 @@ WATCHLIST = {
 }
 
 def get_ai_analysis(ticker_symbol, name):
-    """呼叫 Gemini 進行 K線與新聞分析"""
+    """呼叫 Gemini 進行 K線分析，並要求 AI 額外推薦個股"""
     if not GEMINI_API_KEY:
         return "⚠️ 系統未偵測到 GEMINI_API_KEY，略過 AI 深度分析。"
         
@@ -46,10 +46,13 @@ def get_ai_analysis(ticker_symbol, name):
         news_text = "\n".join([f"- {n.get('title', '')}" for n in news_list[:3]]) if news_list else "無重大新聞"
 
         prompt = f"""
-        你是一位專業的台股分析師。今日你的系統選出了殖利率表現最佳的【{name} ({ticker_symbol})】。
-        以下是近5日K線：\n{kline_text}\n
+        你是一位專業、敏銳的台股操盤手。今日系統篩選出的殖利率冠軍是【{name} ({ticker_symbol})】。
+        以下是該標的近5日K線：\n{kline_text}\n
         近期新聞：\n{news_text}\n
-        請用大約 200 字，簡潔、口語化地給出一段「短評與操作建議」（包含建議的預約單進場價與防守價）。
+
+        請用繁體中文回答以下兩個部分：
+        1. 【首選標的解析】：針對【{name} ({ticker_symbol})】給出簡短的盤勢短評、操作建議（含預約單進場價與防守價）。
+        2. 【AI 獨家觀點與個股推薦】：除了上述系統硬編碼的清單外，請根據你對目前台股市場趨勢、產業熱點（如AI、半導體等）的觀察，額外推薦 1-2 檔你近期看好的「台股個股」（非ETF），並簡述推薦理由與參考進場方向。
         """
         response = model.generate_content(prompt)
         return response.text
@@ -60,16 +63,20 @@ def send_email_notification(subject, message):
     try:
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
-        msg['To'] = RECEIVER_EMAIL
+        
+        # 💡 記得在這裡把你的主信箱與朋友信箱都設定好
+        receivers_list = [RECEIVER_EMAIL, "朋友的信箱@gmail.com"]
+        
+        msg['To'] = ", ".join(receivers_list)
         msg['Subject'] = subject
         msg.attach(MIMEText(message, 'plain', 'utf-8'))
         
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
+        server.sendmail(SENDER_EMAIL, receivers_list, msg.as_string())
         server.quit()
-        print("✅ 報告與 AI 分析已成功寄出！")
+        print("✅ 報告與 AI 分析已成功寄出給所有人！")
     except Exception as e:
         print(f"❌ 寄信失敗：{e}")
 
@@ -101,15 +108,15 @@ def main():
         report_text += f"第 {i} 名：{stock['name']} | 現價: {stock['price']} | 預估殖利率: {stock['yield_pct']}%\n"
         
     report_text += "\n" + "="*40 + "\n"
-    report_text += f"🧠 【AI 代理人深度解析：{best_stock['name']}】\n"
+    report_text += f"🧠 【AI 代理人深度解析與個股推薦】\n"
     report_text += "-"*40 + "\n"
     
-    print(f"正在呼叫 Gemini 分析首選標的: {best_stock['name']}...")
+    print(f"正在呼叫 Gemini 分析首選標的並尋找額外個股推薦...")
     ai_report = get_ai_analysis(best_stock['id'], best_stock['name'])
     report_text += ai_report
     report_text += "\n\n👉 建議開啟永豐大戶投 APP，評估是否掛預約單進場！"
     
-    subject = f"🧠 AI 戰報：首選 {best_stock['name']} (殖利率 {best_stock['yield_pct']}%)"
+    subject = f"🧠 AI 戰報：首選 {best_stock['name']} 暨獨家個股推薦"
     send_email_notification(subject, report_text)
 
 if __name__ == "__main__":
