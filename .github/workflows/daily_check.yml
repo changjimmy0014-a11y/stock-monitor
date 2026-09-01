@@ -2,9 +2,10 @@ name: Stock Monitor Daily Check
 
 on:
   schedule:
-    # 台灣時間週一至週五下午 13:35 (UTC 時間 05:35)
-    - cron: '35 05 * * 1-5'
-  workflow_dispatch: # 允許你在網頁上隨時手動點按鈕立即測試
+    # 台灣時間週一至週五下午 13:00 (UTC 時間 05:00)
+    # 剛好在盤中零股結束前 30 分鐘，完美銜接盤後零股！
+    - cron: '00 05 * * 1-5'
+  workflow_dispatch: 
 
 jobs:
   run-python:
@@ -20,7 +21,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install yfinance pandas requests google-generativeai
+          pip install yfinance pandas requests google-genai
 
       - name: Run script
         env:
