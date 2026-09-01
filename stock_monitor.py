@@ -127,7 +127,7 @@ def scan_with_auto_dividend():
         print("❌ 未能取得任何有效數據。")
 
     print("=" * 65)
-    input("\n分析完畢！按下 Enter 鍵結束程式...")
+    #input("\n分析完畢！按下 Enter 鍵結束程式...")
 
 
 if __name__ == "__main__":
