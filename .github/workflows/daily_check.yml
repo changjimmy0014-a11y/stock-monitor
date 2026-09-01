@@ -2,10 +2,12 @@ name: Stock Monitor Daily Check
 
 on:
   schedule:
-    # 台灣時間週一至週五下午 13:00 (UTC 時間 05:00)
-    # 剛好在盤中零股結束前 30 分鐘，完美銜接盤後零股！
-    - cron: '00 05 * * 1-5'
-  workflow_dispatch: 
+    # 💡 一天執行兩次 (週一至週五)
+    # 1. 台灣時間 12:30 (UTC 04:30) -> 掌握盤中即時動態
+    # 2. 台灣時間 13:15 (UTC 05:15) -> 鎖定收盤價，完美銜接 13:40 盤後零股
+    - cron: '30 04,15 05 * * 1-5'
+    
+  workflow_dispatch: # 允許隨時手動點擊測試
 
 jobs:
   run-python:
