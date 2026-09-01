@@ -16,7 +16,8 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # 換成最穩定的通用文字模型
+    model = genai.GenerativeModel('gemini-pro')
 
 WATCHLIST = {
     "0050.TW":   {"name": "元大台灣50", "div": 3.0},     
